@@ -1,7 +1,7 @@
 import random
 import json
-import gym
-from gym import spaces
+import gymnasium as gym
+from gymnasium import spaces
 import pandas as pd
 import numpy as np
 
@@ -111,9 +111,9 @@ class StockTradingEnv(gym.Env):
 
         obs = self._next_observation()
 
-        return obs, reward, done, {}
+        return obs, reward, done, False, {}
 
-    def reset(self):
+    def reset(self, seed=None, options=None):
         # Reset the state of the environment to an initial state
         self.balance = INITIAL_ACCOUNT_BALANCE
         self.net_worth = INITIAL_ACCOUNT_BALANCE
@@ -127,7 +127,7 @@ class StockTradingEnv(gym.Env):
         self.current_step = random.randint(
             0, len(self.df.loc[:, 'Open'].values) - 6)
 
-        return self._next_observation()
+        return self._next_observation(), {}
 
     def render(self, mode='human', close=False):
         # Render the environment to the screen
