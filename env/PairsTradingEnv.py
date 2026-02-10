@@ -26,22 +26,25 @@ class PairsTradingEnv(gym.Env):
     
     metadata = {"render_modes": ["human"]}
     
-    def __init__(self, df, initial_balance=10000.0, window_size=10, use_features=None):
+    def __init__(self, df, initial_balance=10000.0, window_size=10, use_features=None, train_stats=None):
         """
         初始化环境
         
         Args:
-            df: 包含配对特征的DataFrame（来自pair_NINGDE_BYD.csv）
+            df: 包含配对特征的DataFrame（来自pair_NINGDE_BYD.csv或分区后的train/val/test）
             initial_balance: 初始账户余额
             window_size: 观察窗口大小（使用过去N个时间步）
             use_features: 使用的特征列表，默认为['zscore', 'spread_ma5', 'spread_std', 
                          'bollinger_high', 'bollinger_low', 'volume_ratio']
+            train_stats: 可选，由训练集计算得到的归一化统计量字典（确保无数据泄露），
+                         若提供则用于归一化；否则从传入的df计算（不推荐）
         """
         super().__init__()
         
         self.df = df.reset_index(drop=True)
         self.initial_balance = float(initial_balance)
         self.window_size = int(window_size)
+        self.train_stats = train_stats  # 固化的训练集统计量，用于归一化
         
         # 选择用于观察的特征
         if use_features is None:
@@ -55,7 +58,7 @@ class PairsTradingEnv(gym.Env):
             if feat not in self.df.columns:
                 raise ValueError(f"特征 '{feat}' 不存在于数据中")
         
-        # 计算特征的归一化参数
+        # 计算或加载特征的归一化参数（如果提供了train_stats则直接使用）
         self._calculate_normalization_params()
         
         # ===== 动作空间 =====
@@ -96,15 +99,28 @@ class PairsTradingEnv(gym.Env):
         self.stock2_price = None
     
     def _calculate_normalization_params(self):
-        """计算特征的统计参数用于归一化"""
+        """计算或加载特征归一化参数：
+        - 优先使用外部提供的 `self.train_stats`（训练集统计量），保证无数据泄露；
+        - 若未提供，则退回到对传入的 `df` 进行统计（仅在调试/快速实验时使用，不推荐）。
+        """
         self.feature_means = {}
         self.feature_stds = {}
-        
-        for feat in self.use_features:
-            self.feature_means[feat] = float(self.df[feat].mean())
-            std = float(self.df[feat].std())
-            # 防止除以0
-            self.feature_stds[feat] = std if std > 1e-6 else 1.0
+
+        if self.train_stats is not None:
+            # 从训练集固化统计量加载
+            for feat in self.use_features:
+                stats = self.train_stats.get(feat)
+                if stats is None:
+                    raise ValueError(f"train_stats 中缺少特征 {feat} 的统计量")
+                self.feature_means[feat] = float(stats.get('mean', 0.0))
+                std = float(stats.get('std', 1.0))
+                self.feature_stds[feat] = std if std > 1e-6 else 1.0
+        else:
+            # 回退：从当前数据计算（存在数据泄露风险，仅用于快速调试）
+            for feat in self.use_features:
+                self.feature_means[feat] = float(self.df[feat].mean())
+                std = float(self.df[feat].std())
+                self.feature_stds[feat] = std if std > 1e-6 else 1.0
     
     def _get_window_observation(self, current_idx):
         """
