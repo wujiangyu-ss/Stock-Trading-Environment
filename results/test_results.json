@@ -1,0 +1,17 @@
+{
+  "initial_balance": 10000.0,
+  "final_net_worth": 11445.620000000006,
+  "total_return": 0.14456200000000063,
+  "total_return_pct": 14.456200000000063,
+  "total_reward": 0.14486424931713981,
+  "steps": 237,
+  "max_net_worth": 11545.860000000006,
+  "min_net_worth": 8672.220000000005,
+  "sharpe_ratio": 1.0571687896144124,
+  "max_drawdown": 13.277799999999951,
+  "action_distribution": {
+    "做多价差": 107,
+    "平仓": 58,
+    "做空价差": 72
+  }
+}
