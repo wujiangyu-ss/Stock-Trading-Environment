@@ -15,119 +15,189 @@ INITIAL_ACCOUNT_BALANCE = 10000
 
 
 class StockTradingEnv(gym.Env):
-    """A stock trading environment for OpenAI gym"""
-    metadata = {'render.modes': ['human']}
+    """Merged, improved StockTradingEnv (v2 implementation under the original filename).
 
-    def __init__(self, df):
-        super(StockTradingEnv, self).__init__()
+    - Improved normalization and numeric safety
+    - Stable reward: tanh(step-wise net-worth return) clipped to [-1,1]
+    - Fixed windowing and NaN/Inf protections
+    
+    """
+    metadata = {"render_modes": ["human"]}
 
-        self.df = df
-        self.reward_range = (0, MAX_ACCOUNT_BALANCE)
+    def __init__(self, df, initial_balance: float = 10000.0, window_size: int = 6):
+        super().__init__()
+        assert window_size >= 2, "window_size must be >= 2"
 
-        # Actions of the format Buy x%, Sell x%, Hold, etc.
-        self.action_space = spaces.Box(
-            low=np.array([0, 0]), high=np.array([3, 1]), dtype=np.float16)
+        self.df = df.reset_index(drop=True)
+        self.window_size = int(window_size)
+        self.initial_balance = float(initial_balance)
 
-        # Prices contains the OHCL values for the last five prices
-        self.observation_space = spaces.Box(
-            low=0, high=1, shape=(6, 6), dtype=np.float16)
+        # normalization constants
+        self.max_price = float(max(1.0, self.df[["Open", "High", "Low", "Close"]].max().max()))
+        self.max_volume = float(max(1.0, self.df["Volume"].max()))
+
+        # action: [action_type (0..3), amount (0..1)]
+        self.action_space = spaces.Box(low=np.array([0.0, 0.0]), high=np.array([3.0, 1.0]), dtype=np.float32)
+
+        # obs: window_size columns of OHLCV (5 x window_size) + 1 row of account stats (6 elements)
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(5 + 1, self.window_size), dtype=np.float32)
+
+        # internal state placeholders
+        self.balance = None
+        self.net_worth = None
+        self.max_net_worth = None
+        self.shares_held = None
+        self.cost_basis = None
+        self.total_shares_sold = None
+        self.total_sales_value = None
+        self.current_step = None
+
+    def _get_window(self, start: int):
+        # ensure a valid fixed-size window
+        end = start + self.window_size - 1
+        if end > len(self.df) - 1:
+            start = max(0, len(self.df) - self.window_size)
+            end = start + self.window_size - 1
+        return self.df.loc[start:end]
 
     def _next_observation(self):
-        # Get the stock data points for the last 5 days and scale to between 0-1
-        frame = np.array([
-            self.df.loc[self.current_step: self.current_step +
-                        5, 'Open'].values / MAX_SHARE_PRICE,
-            self.df.loc[self.current_step: self.current_step +
-                        5, 'High'].values / MAX_SHARE_PRICE,
-            self.df.loc[self.current_step: self.current_step +
-                        5, 'Low'].values / MAX_SHARE_PRICE,
-            self.df.loc[self.current_step: self.current_step +
-                        5, 'Close'].values / MAX_SHARE_PRICE,
-            self.df.loc[self.current_step: self.current_step +
-                        5, 'Volume'].values / MAX_NUM_SHARES,
-        ])
+        window = self._get_window(self.current_step)
 
-        # Append additional data and scale each value to between 0-1
-        obs = np.append(frame, [[
-            self.balance / MAX_ACCOUNT_BALANCE,
-            self.max_net_worth / MAX_ACCOUNT_BALANCE,
-            self.shares_held / MAX_NUM_SHARES,
-            self.cost_basis / MAX_SHARE_PRICE,
-            self.total_shares_sold / MAX_NUM_SHARES,
-            self.total_sales_value / (MAX_NUM_SHARES * MAX_SHARE_PRICE),
-        ]], axis=0)
+        open_ = window["Open"].values.astype(np.float32) / self.max_price
+        high_ = window["High"].values.astype(np.float32) / self.max_price
+        low_ = window["Low"].values.astype(np.float32) / self.max_price
+        close_ = window["Close"].values.astype(np.float32) / self.max_price
+        vol_ = window["Volume"].values.astype(np.float32) / self.max_volume
 
+        # shape (5, window_size)
+        price_frame = np.vstack([open_, high_, low_, close_, vol_])
+
+        account = np.array([
+            self.balance / self.initial_balance,
+            self.max_net_worth / self.initial_balance,
+            self.shares_held / max(1.0, float(1e9)),  # scale-down placeholder
+            (self.cost_basis / self.max_price) if self.max_price > 0 else 0.0,
+            self.total_shares_sold / max(1.0, float(1e9)),
+            self.total_sales_value / (self.max_volume * self.max_price + 1e-12),
+        ], dtype=np.float32)
+
+        # Replicate account stats across window columns to keep consistent 2D shape
+        account_row = np.tile(account.reshape(-1, 1), (1, self.window_size))  # shape (6, window_size)
+
+        # we want final obs shape (6, window_size) - but our observation_space was defined as (6, window_size)
+        obs = np.vstack([price_frame, account_row[0:1, :]])  # only append one row to keep consistent with original description
+
+        obs = np.nan_to_num(obs, nan=0.0, posinf=1e6, neginf=-1e6).astype(np.float32)
         return obs
 
     def _take_action(self, action):
-        # Set the current price to a random price within the time step
-        current_price = random.uniform(
-            self.df.loc[self.current_step, "Open"], self.df.loc[self.current_step, "Close"])
+        # numeric safety
+        action_type = float(action[0])
+        amount = float(action[1])
 
-        action_type = action[0]
-        amount = action[1]
+        # pick a representative price at current_step (use Close for determinism)
+        cur_price = float(self.df.loc[self.current_step, "Close"]) if "Close" in self.df.columns else float(self.df.loc[self.current_step, "Open"]) 
+        cur_price = max(1e-6, cur_price)
 
-        if action_type < 1:
-            # Buy amount % of balance in shares
-            total_possible = int(self.balance / current_price)
-            shares_bought = int(total_possible * amount)
-            prev_cost = self.cost_basis * self.shares_held
-            additional_cost = shares_bought * current_price
+        if action_type < 1.0:
+            total_possible = int(self.balance // cur_price)
+            shares_bought = int(total_possible * np.clip(amount, 0.0, 1.0))
+            if shares_bought > 0:
+                additional_cost = shares_bought * cur_price
+                prev_cost = self.cost_basis * self.shares_held
+                denom = (self.shares_held + shares_bought)
+                self.balance -= additional_cost
+                if denom > 0:
+                    self.cost_basis = (prev_cost + additional_cost) / denom
+                else:
+                    self.cost_basis = 0.0
+                self.shares_held += shares_bought
 
-            self.balance -= additional_cost
-            self.cost_basis = (
-                prev_cost + additional_cost) / (self.shares_held + shares_bought)
-            self.shares_held += shares_bought
+        elif action_type < 2.0:
+            shares_sold = int(self.shares_held * np.clip(amount, 0.0, 1.0))
+            if shares_sold > 0:
+                self.balance += shares_sold * cur_price
+                self.shares_held -= shares_sold
+                self.total_shares_sold += shares_sold
+                self.total_sales_value += shares_sold * cur_price
 
-        elif action_type < 2:
-            # Sell amount % of shares held
-            shares_sold = int(self.shares_held * amount)
-            self.balance += shares_sold * current_price
-            self.shares_held -= shares_sold
-            self.total_shares_sold += shares_sold
-            self.total_sales_value += shares_sold * current_price
-
-        self.net_worth = self.balance + self.shares_held * current_price
-
+        # update net worth
+        self.net_worth = float(self.balance + self.shares_held * cur_price)
         if self.net_worth > self.max_net_worth:
             self.max_net_worth = self.net_worth
 
         if self.shares_held == 0:
-            self.cost_basis = 0
+            self.cost_basis = 0.0
+
+        # numerical clamp
+        if not np.isfinite(self.cost_basis):
+            self.cost_basis = 0.0
+        if not np.isfinite(self.net_worth):
+            self.net_worth = float(self.balance)
 
     def step(self, action):
-        # Execute one time step within the environment
+        prev_net = float(self.net_worth)
         self._take_action(action)
 
         self.current_step += 1
+        truncated = False
+        if self.current_step > len(self.df) - self.window_size:
+            truncated = True
 
-        if self.current_step > len(self.df.loc[:, 'Open'].values) - 6:
-            self.current_step = 0
+        reward = 0.0
+        if prev_net > 0:
+            step_return = (self.net_worth - prev_net) / prev_net
+            reward = float(np.tanh(step_return))
+        reward = float(np.clip(reward, -1.0, 1.0))
 
-        delay_modifier = (self.current_step / MAX_STEPS)
-
-        reward = self.balance * delay_modifier
-        done = self.net_worth <= 0
+        terminated = self.net_worth <= 0
 
         obs = self._next_observation()
-
-        return obs, reward, done, False, {}
+        info = {}
+        return obs, reward, terminated, truncated, info
 
     def reset(self, seed=None, options=None):
-        # Reset the state of the environment to an initial state
-        self.balance = INITIAL_ACCOUNT_BALANCE
-        self.net_worth = INITIAL_ACCOUNT_BALANCE
-        self.max_net_worth = INITIAL_ACCOUNT_BALANCE
+        super().reset(seed=seed)
+        if seed is not None:
+            random.seed(seed)
+            np.random.seed(seed)
+
+        self.balance = float(self.initial_balance)
+        self.net_worth = float(self.initial_balance)
+        self.max_net_worth = float(self.initial_balance)
         self.shares_held = 0
-        self.cost_basis = 0
+        self.cost_basis = 0.0
         self.total_shares_sold = 0
-        self.total_sales_value = 0
+        self.total_sales_value = 0.0
+
+        # set current step
+        self.current_step = int(random.randint(0, max(0, len(self.df) - self.window_size)))
+
+        obs = self._next_observation()
+        return obs, {}
+
+    def reset(self, seed=None, options=None):
+        # Follow gymnasium API and reset RNGs for reproducibility
+        super().reset(seed=seed)
+        if seed is not None:
+            random.seed(seed)
+            np.random.seed(seed)
+
+        # Reset the state of the environment to an initial state
+        self.balance = float(INITIAL_ACCOUNT_BALANCE)
+        self.net_worth = float(INITIAL_ACCOUNT_BALANCE)
+        self.max_net_worth = float(INITIAL_ACCOUNT_BALANCE)
+        self.shares_held = 0
+        self.cost_basis = 0.0
+        self.total_shares_sold = 0
+        self.total_sales_value = 0.0
 
         # Set the current step to a random point within the data frame
-        self.current_step = random.randint(
-            0, len(self.df.loc[:, 'Open'].values) - 6)
+        self.current_step = int(random.randint(
+            0, len(self.df.loc[:, 'Open'].values) - 6))
 
-        return self._next_observation(), {}
+        obs = self._next_observation()
+        return obs, {}
 
     def render(self, mode='human', close=False):
         # Render the environment to the screen
