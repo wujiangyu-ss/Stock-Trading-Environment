@@ -26,11 +26,7 @@ class PairsTradingEnv(gym.Env):
     
     metadata = {"render_modes": ["human"]}
     
-<<<<<<< Updated upstream
-    def __init__(self, df, initial_balance=10000.0, window_size=10, use_features=None):
-=======
     def __init__(self, df, initial_balance=10000.0, window_size=10, use_features=None, train_stats=None, mode='train', frozen_stats=None):
->>>>>>> Stashed changes
         """
         初始化环境
         
@@ -46,12 +42,9 @@ class PairsTradingEnv(gym.Env):
         self.df = df.reset_index(drop=True)
         self.initial_balance = float(initial_balance)
         self.window_size = int(window_size)
-<<<<<<< Updated upstream
-=======
         self.train_stats = train_stats  # 兼容旧参数名
         self.mode = mode  # 'train' / 'val' / 'test'
         self.frozen_stats = frozen_stats  # 来自 train_stats.json 的冻结整体参数（如 spread_mean/spread_std）
->>>>>>> Stashed changes
         
         # 选择用于观察的特征
         if use_features is None:
@@ -109,14 +102,6 @@ class PairsTradingEnv(gym.Env):
         """计算特征的统计参数用于归一化"""
         self.feature_means = {}
         self.feature_stds = {}
-<<<<<<< Updated upstream
-        
-        for feat in self.use_features:
-            self.feature_means[feat] = float(self.df[feat].mean())
-            std = float(self.df[feat].std())
-            # 防止除以0
-            self.feature_stds[feat] = std if std > 1e-6 else 1.0
-=======
 
         # 优先使用外部冻结的整体训练参数（frozen_stats）来处理 'zscore' 的计算/归一化
         if self.frozen_stats is not None:
@@ -157,7 +142,6 @@ class PairsTradingEnv(gym.Env):
                 self.feature_means[feat] = float(tmp.mean()) if len(tmp) > 0 else 0.0
                 std = float(tmp.std()) if len(tmp) > 0 else 1.0
                 self.feature_stds[feat] = std if std > 1e-6 else 1.0
->>>>>>> Stashed changes
     
     def _get_window_observation(self, current_idx):
         """
