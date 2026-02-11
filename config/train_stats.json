@@ -1,0 +1,11 @@
+{
+  "spread_mean": 128.40511340206186,
+  "spread_std": 53.88482629160357,
+  "rolling_window": 20,
+  "features": [
+    "spread",
+    "spread_rm",
+    "spread_rstd",
+    "zscore"
+  ]
+}

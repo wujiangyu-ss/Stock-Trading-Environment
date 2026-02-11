@@ -26,7 +26,11 @@ class PairsTradingEnv(gym.Env):
     
     metadata = {"render_modes": ["human"]}
     
+<<<<<<< Updated upstream
     def __init__(self, df, initial_balance=10000.0, window_size=10, use_features=None):
+=======
+    def __init__(self, df, initial_balance=10000.0, window_size=10, use_features=None, train_stats=None, mode='train', frozen_stats=None):
+>>>>>>> Stashed changes
         """
         初始化环境
         
@@ -42,6 +46,12 @@ class PairsTradingEnv(gym.Env):
         self.df = df.reset_index(drop=True)
         self.initial_balance = float(initial_balance)
         self.window_size = int(window_size)
+<<<<<<< Updated upstream
+=======
+        self.train_stats = train_stats  # 兼容旧参数名
+        self.mode = mode  # 'train' / 'val' / 'test'
+        self.frozen_stats = frozen_stats  # 来自 train_stats.json 的冻结整体参数（如 spread_mean/spread_std）
+>>>>>>> Stashed changes
         
         # 选择用于观察的特征
         if use_features is None:
@@ -99,12 +109,55 @@ class PairsTradingEnv(gym.Env):
         """计算特征的统计参数用于归一化"""
         self.feature_means = {}
         self.feature_stds = {}
+<<<<<<< Updated upstream
         
         for feat in self.use_features:
             self.feature_means[feat] = float(self.df[feat].mean())
             std = float(self.df[feat].std())
             # 防止除以0
             self.feature_stds[feat] = std if std > 1e-6 else 1.0
+=======
+
+        # 优先使用外部冻结的整体训练参数（frozen_stats）来处理 'zscore' 的计算/归一化
+        if self.frozen_stats is not None:
+            # 对于已经是 Z-Score 的列（如果数据预先计算了 zscore），我们不再对其做二次归一化
+            for feat in self.use_features:
+                if feat == 'zscore':
+                    self.feature_means[feat] = 0.0
+                    self.feature_stds[feat] = 1.0
+                else:
+                    # 其他特征优先尝试从 self.train_stats（按特征存储）读取
+                    if self.train_stats is not None and isinstance(self.train_stats, dict):
+                        stats = self.train_stats.get(feat)
+                        if stats is not None:
+                            self.feature_means[feat] = float(stats.get('mean', 0.0))
+                            std = float(stats.get('std', 1.0))
+                            self.feature_stds[feat] = std if std > 1e-6 else 1.0
+                            continue
+                    # 回退：从训练分区计算（如果有'dataset'列），否则从整个 df 计算
+                    if 'dataset' in self.df.columns and self.mode == 'train':
+                        tmp = self.df[self.df['dataset'] == 'train'][feat]
+                    elif 'dataset' in self.df.columns:
+                        # 始终从训练分区计算均值/方差以避免泄露
+                        tmp = self.df[self.df['dataset'] == 'train'][feat]
+                    else:
+                        tmp = self.df[feat]
+                    self.feature_means[feat] = float(tmp.mean()) if len(tmp) > 0 else 0.0
+                    std = float(tmp.std()) if len(tmp) > 0 else 1.0
+                    self.feature_stds[feat] = std if std > 1e-6 else 1.0
+            return
+        else:
+            # 回退：从当前数据计算（存在数据泄露风险，仅用于快速调试）
+            # 如果存在'dataset'列并且为训练模式，则仅使用训练分区来计算
+            for feat in self.use_features:
+                if 'dataset' in self.df.columns and self.mode == 'train':
+                    tmp = self.df[self.df['dataset'] == 'train'][feat]
+                else:
+                    tmp = self.df[feat]
+                self.feature_means[feat] = float(tmp.mean()) if len(tmp) > 0 else 0.0
+                std = float(tmp.std()) if len(tmp) > 0 else 1.0
+                self.feature_stds[feat] = std if std > 1e-6 else 1.0
+>>>>>>> Stashed changes
     
     def _get_window_observation(self, current_idx):
         """
@@ -303,22 +356,19 @@ class PairsTradingEnv(gym.Env):
         # 记录前一步的净资产
         prev_net_worth = float(self.net_worth)
         
-        # 从数据中获取当前时刻的股票价格（使用价差和价格比进行回推）
+        # 从数据中获取当前时刻的股票价格
         current_row = self.df.iloc[self.current_step]
-        
-        # 获取价差和价格比
-        price_spread = float(current_row['price_spread'])
-        price_ratio = float(current_row['price_ratio'])
-        
-        # 通过价差和价格比反推两只股票的价格
-        # price_ratio = stock1_close / stock2_close
-        # price_spread = stock1_close - stock2_close
-        # 解方程组：stock1 = stock2 * price_ratio; stock1 - stock2 = price_spread
-        # stock2 * price_ratio - stock2 = price_spread
-        # stock2 * (price_ratio - 1) = price_spread
-        
-        stock2_price = price_spread / (price_ratio - 1 + 1e-6)
-        stock1_price = price_spread + stock2_price
+
+        # 优先使用显式的收盘价列（如果存在）
+        if 'NINGDE_Close' in self.df.columns and 'BYD_Close' in self.df.columns:
+            stock1_price = float(current_row['NINGDE_Close'])
+            stock2_price = float(current_row['BYD_Close'])
+        else:
+            # 回退：使用价差和价格比来反推两只股票的价格
+            price_spread = float(current_row['price_spread'])
+            price_ratio = float(current_row['price_ratio'])
+            stock2_price = price_spread / (price_ratio - 1 + 1e-6)
+            stock1_price = price_spread + stock2_price
         
         # 防止负价格
         stock1_price = max(1e-6, stock1_price)
@@ -393,16 +443,24 @@ class PairsTradingEnv(gym.Env):
         self.total_trades = 0
         self.profitable_trades = 0
         
-        # 随机选择起始时间步（避免从数据的最后部分开始，防止数据不足）
-        max_start = max(0, len(self.df) - self.window_size - 100)
-        self.current_step = np.random.randint(0, max_start) if max_start > 0 else 0
+        # 支持通过 options 指定 start_index（用于验证/测试的可复现评估）
+        if options is not None and isinstance(options, dict) and 'start_index' in options:
+            self.current_step = int(options.get('start_index', 0))
+        else:
+            # 随机选择起始时间步（避免从数据的最后部分开始，防止数据不足）
+            max_start = max(0, len(self.df) - self.window_size - 100)
+            self.current_step = np.random.randint(0, max_start) if max_start > 0 else 0
         
-        # 初始化价格
+        # 初始化价格（优先使用显式收盘价）
         current_row = self.df.iloc[self.current_step]
-        price_spread = float(current_row['price_spread'])
-        price_ratio = float(current_row['price_ratio'])
-        self.stock2_price = price_spread / (price_ratio - 1 + 1e-6)
-        self.stock1_price = price_spread + self.stock2_price
+        if 'NINGDE_Close' in self.df.columns and 'BYD_Close' in self.df.columns:
+            self.stock1_price = float(current_row['NINGDE_Close'])
+            self.stock2_price = float(current_row['BYD_Close'])
+        else:
+            price_spread = float(current_row['price_spread'])
+            price_ratio = float(current_row['price_ratio'])
+            self.stock2_price = price_spread / (price_ratio - 1 + 1e-6)
+            self.stock1_price = price_spread + self.stock2_price
         self.stock1_price = max(1e-6, self.stock1_price)
         self.stock2_price = max(1e-6, self.stock2_price)
         

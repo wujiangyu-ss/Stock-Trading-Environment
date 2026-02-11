@@ -1,0 +1,13 @@
+metric,value
+累计收益率 (Total Return),0.0423690000000001
+年化收益率 (Annualized Return),0.04397223730035971
+年化波动率 (Annualized Volatility),0.03500041721209641
+夏普比率 (Sharpe Ratio),1.256334661209769
+卡玛比率 (Calmar Ratio),3.6926635287503986
+索提诺比率 (Sortino Ratio),0.6432490219827448
+最大回撤 (Max Drawdown),0.01190799999999999
+最大回撤期 (Max Drawdown Duration days),65
+总交易次数 (Total Trades),3
+胜率 (Win Rate),0.6666666666666666
+平均盈亏比 (Average Profit/Loss Ratio),4.398509385351485
+平均持仓时间 (Average Holding Period days),12.333333333333334
