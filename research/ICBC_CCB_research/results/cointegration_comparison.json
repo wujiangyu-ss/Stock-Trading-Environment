@@ -1,0 +1,20 @@
+{
+  "pair_1_baseline": {
+    "name": "宁德时代 (300750) / 比亚迪 (002594)",
+    "note": "需要从baseline目录提取"
+  },
+  "pair_2_new": {
+    "name": "工商银行 (601398) / 建设银行 (601939)",
+    "test_result": {
+      "test_type": "Engle-Granger Cointegration Test",
+      "stock_pair": "工商银行(601398.SH) vs 建设银行(601939.SH)",
+      "test_data": "Training Set (up to 2023-12-31)",
+      "sample_size": 970,
+      "test_statistic": -4.8263598055530395,
+      "p_value": 0.0003389888270519764,
+      "significant_at_0.05": true,
+      "significant_at_0.01": true,
+      "interpretation": "Cointegrated"
+    }
+  }
+}

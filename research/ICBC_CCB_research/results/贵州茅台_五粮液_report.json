@@ -1,0 +1,94 @@
+{
+  "title": "配对交易研究复现报告",
+  "timestamp": "2026-02-11T19:30:05.090866",
+  "research_pair": {
+    "stock1": "贵州茅台 (600519.SH)",
+    "stock2": "五粮液 (000858.SZ)",
+    "pair_name": "贵州茅台_五粮液"
+  },
+  "data_overview": {
+    "data_range": "2020-01-01 至 2025-12-31",
+    "train_period": "2020-01-01 至 2023-12-31",
+    "val_period": "2023-12-31 + 1 至 2024-12-31",
+    "test_period": "2024-12-31 + 1 至 2025-12-31",
+    "train_samples": 970,
+    "val_samples": 242,
+    "test_samples": 243,
+    "total_samples": 1455
+  },
+  "cointegration_test": "Not completed",
+  "training_statistics": {
+    "price_ratio": {
+      "mean": 9.106990286485908,
+      "std": 1.6838308057697222,
+      "min": 6.048360067033756,
+      "max": 12.989537490658472
+    },
+    "price_spread": {
+      "mean": 1386.6025051546392,
+      "std": 236.86862044803246,
+      "min": 683.73,
+      "max": 2066.52
+    },
+    "zscore": {
+      "mean": 0.12686376156807658,
+      "std": 1.2862683672901831,
+      "min": -3.0166660296828156,
+      "max": 3.4290414963504885
+    },
+    "spread_ma5": {
+      "mean": 1385.1535542955323,
+      "std": 236.98818683910957,
+      "min": 707.008,
+      "max": 1945.6059999999998
+    },
+    "spread_ma20": {
+      "mean": 1379.9331394301396,
+      "std": 238.63214838182847,
+      "min": 745.779,
+      "max": 1754.2724999999998
+    },
+    "spread_std": {
+      "mean": 47.34198695451494,
+      "std": 28.244195166324012,
+      "min": 0.0,
+      "max": 166.53032580710794
+    },
+    "bollinger_high": {
+      "mean": 1474.6171133391697,
+      "std": 258.4006903529986,
+      "min": 784.8569567827279,
+      "max": 2051.8294156984944
+    },
+    "bollinger_low": {
+      "mean": 1285.24916552111,
+      "std": 231.30405139663017,
+      "min": 669.780445161136,
+      "max": 1595.6150573123793
+    },
+    "volume_ratio": {
+      "mean": 0.16033153739206743,
+      "std": 0.05866266099320992,
+      "min": 0.051339348122977,
+      "max": 0.736362063720256
+    }
+  },
+  "methodology": {
+    "data_splitting": "严格时间切分，防止未来信息泄露",
+    "feature_engineering": "滚动特征（MA5, MA20, Bollinger Band, Z-Score）",
+    "normalization": "使用训练集冻结参数进行所有数据集的标准化",
+    "tools": [
+      "pandas",
+      "numpy",
+      "statsmodels"
+    ]
+  },
+  "output_files": {
+    "training_data": "D:\\java\\Stock-Trading-Environment\\research\\ICBC_CCB_research\\data\\strict\\600519.SH_000858.SZ\\pair_train.csv",
+    "validation_data": "D:\\java\\Stock-Trading-Environment\\research\\ICBC_CCB_research\\data\\strict\\600519.SH_000858.SZ\\pair_val.csv",
+    "test_data": "D:\\java\\Stock-Trading-Environment\\research\\ICBC_CCB_research\\data\\strict\\600519.SH_000858.SZ\\pair_test.csv",
+    "all_data": "D:\\java\\Stock-Trading-Environment\\research\\ICBC_CCB_research\\data\\strict\\600519.SH_000858.SZ\\pair_all.csv",
+    "training_stats": "D:\\java\\Stock-Trading-Environment\\research\\ICBC_CCB_research\\data\\strict\\600519.SH_000858.SZ\\train_stats.json",
+    "split_log": "D:\\java\\Stock-Trading-Environment\\research\\ICBC_CCB_research\\results\\data_split_log.json"
+  }
+}

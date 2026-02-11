@@ -1,0 +1,104 @@
+{
+  "title": "配对交易研究复现报告",
+  "timestamp": "2026-02-11T19:01:23.654925",
+  "research_pair": {
+    "stock1": "工商银行 (601398.SH)",
+    "stock2": "建设银行 (601939.SH)",
+    "pair_name": "工商银行_建设银行_ICBC_CCB"
+  },
+  "data_overview": {
+    "data_range": "2020-01-01 至 2025-12-31",
+    "train_period": "2020-01-01 至 2023-12-31",
+    "val_period": "2023-12-31 + 1 至 2024-12-31",
+    "test_period": "2024-12-31 + 1 至 2025-12-31",
+    "train_samples": 970,
+    "val_samples": 242,
+    "test_samples": 243,
+    "total_samples": 1455
+  },
+  "cointegration_test": {
+    "test_type": "Engle-Granger Cointegration Test",
+    "stock_pair": "工商银行(601398.SH) vs 建设银行(601939.SH)",
+    "test_data": "Training Set (up to 2023-12-31)",
+    "sample_size": 970,
+    "test_statistic": -4.8263598055530395,
+    "p_value": 0.0003389888270519764,
+    "significant_at_0.05": true,
+    "significant_at_0.01": true,
+    "interpretation": "Cointegrated"
+  },
+  "training_statistics": {
+    "price_ratio": {
+      "mean": 0.7798437048293666,
+      "std": 0.030227720229908796,
+      "min": 0.7066420664206642,
+      "max": 0.8740740740740741
+    },
+    "price_spread": {
+      "mean": -0.9972268041237112,
+      "std": 0.22210095442325345,
+      "min": -1.6000000000000005,
+      "max": -0.5
+    },
+    "zscore": {
+      "mean": -0.13778945615756907,
+      "std": 1.2276767918832854,
+      "min": -3.7714203042237697,
+      "max": 3.4196440444927108
+    },
+    "spread_ma5": {
+      "mean": -0.995848969072165,
+      "std": 0.2183459164729722,
+      "min": -1.576,
+      "max": -0.542
+    },
+    "spread_ma20": {
+      "mean": -0.9908085973159347,
+      "std": 0.20930216276848151,
+      "min": -1.451,
+      "max": -0.6090000000000001
+    },
+    "spread_std": {
+      "mean": 0.05587649661030737,
+      "std": 0.035086807418864746,
+      "min": 0.0,
+      "max": 0.22073740054644234
+    },
+    "bollinger_high": {
+      "mean": -0.87905560409532,
+      "std": 0.20311256210125592,
+      "min": -1.3303848491020493,
+      "max": -0.34352704678442664
+    },
+    "bollinger_low": {
+      "mean": -1.1025615905365496,
+      "std": 0.23708384642269353,
+      "min": -1.6567916676607577,
+      "max": -0.7408531878943212
+    },
+    "volume_ratio": {
+      "mean": 2.6609568554074468,
+      "std": 0.9446093734466005,
+      "min": 0.834213940221827,
+      "max": 7.403570028240596
+    }
+  },
+  "methodology": {
+    "data_splitting": "严格时间切分，防止未来信息泄露",
+    "feature_engineering": "滚动特征（MA5, MA20, Bollinger Band, Z-Score）",
+    "normalization": "使用训练集冻结参数进行所有数据集的标准化",
+    "tools": [
+      "pandas",
+      "numpy",
+      "statsmodels"
+    ]
+  },
+  "output_files": {
+    "training_data": "D:\\java\\Stock-Trading-Environment\\research\\ICBC_CCB_research\\data\\strict\\pair_train.csv",
+    "validation_data": "D:\\java\\Stock-Trading-Environment\\research\\ICBC_CCB_research\\data\\strict\\pair_val.csv",
+    "test_data": "D:\\java\\Stock-Trading-Environment\\research\\ICBC_CCB_research\\data\\strict\\pair_test.csv",
+    "all_data": "D:\\java\\Stock-Trading-Environment\\research\\ICBC_CCB_research\\data\\strict\\pair_all.csv",
+    "training_stats": "D:\\java\\Stock-Trading-Environment\\research\\ICBC_CCB_research\\data\\strict\\train_stats.json",
+    "split_log": "D:\\java\\Stock-Trading-Environment\\research\\ICBC_CCB_research\\results\\data_split_log.json"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "report_title": "配对交易严格复现研究 - 对标分析报告",
+  "generation_date": "2026-02-11T19:02:04.160146",
+  "baseline_case": {
+    "name": "宁德时代 (300750) / 比亚迪 (002594)",
+    "description": "新能源汽车产业链配对",
+    "status": "Baseline Reference",
+    "data_period": "2020-01-01 至 2025-12-31",
+    "train_test_split": "70% / 15% / 15%"
+  },
+  "research_case": {
+    "name": "工商银行 (601398) / 建设银行 (601939)",
+    "description": "金融行业大型银行配对",
+    "status": "Completed",
+    "data_period": "2020-01-01 至 2025-12-31",
+    "train_test_split": "70% / 15% / 15%"
+  },
+  "methodology_alignment": {
+    "data_acquisition": "✓ AKShare前复权数据",
+    "anti_leakage_processing": "✓ 严格时间切分，冻结参数",
+    "feature_engineering": "✓ 相同的滚动特征集",
+    "statistical_tests": "✓ Engle-Granger协整检验",
+    "results_format": "✓ 统一的输出格式"
+  },
+  "key_findings": {
+    "new_pair_cointegration": "Cointegrated",
+    "training_data_quality": "970 training samples",
+    "validation_data_quality": "242 validation samples",
+    "test_data_quality": "243 test samples"
+  },
+  "next_steps": [
+    "基于新配对的防泄露特征，训练PPO模型",
+    "与基准模型进行性能对比",
+    "评估新配对的交易可行性",
+    "验证研究方法的可复现性"
+  ]
+}
